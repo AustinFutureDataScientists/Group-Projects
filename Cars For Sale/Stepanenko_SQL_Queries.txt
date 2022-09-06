@@ -1,48 +1,41 @@
-WITH
-ds AS
-(
-  SELECT
-    transaction_date,
-    type,
-    COALESCE(amount,0) AS deposit
-  FROM transactions
-  WHERE type='deposit'
-  ORDER BY transaction_date
-),
-ws AS
-(
-  SELECT
-    transaction_date,
-    type,
-    COALESCE(amount,0) AS withdrawal
-  FROM transactions
-  WHERE type='withdrawal'
-  ORDER BY transaction_date
-),
-combined_table AS
-(
-  SELECT
-  COALESCE(ds.transaction_date, ws.transaction_date) AS date,
-  COALESCE(deposit,0) AS deposit,
-  COALESCE(withdrawal,0) AS withdrawal
-
-  FROM ds
-  FULL OUTER JOIN ws
-  ON ds.transaction_date=ws.transaction_date
-  ORDER BY COALESCE(ds.transaction_date, ws.transaction_date)
-),
-balance AS
-(
-  SELECT DISTINCT
-  date,
-  SUM(deposit-withdrawal)
-    OVER
-    (
-      PARTITION BY DATE_TRUNC('month',date) ORDER BY date
-    )
-  AS day_balance
-  FROM
-  combined_table
-  ORDER BY date
-)
-SELECT * FROM balance;
+- Converting the price column
+    
+    ```sql
+    update cars_sold 
+    set price =replace(price, '$', '');
+    update cars_sold 
+    set price = regexp_replace(price, '[^0-9]+','');
+    
+    alter table cars_sold add price_numeral number(6,0);
+    update cars_sold set price_numeral=to_number(price);
+    update cars_sold set price='';
+    alter table cars_sold modify price number(6,0);
+    update cars_sold set price=price_numeral;
+    alter table cars_sold drop column price_numeral;
+    
+    ```
+    
+- Aggregate all of the ‘Certified’ types
+    
+    ```sql
+    update cars_sold 
+    set used_new = 
+    	regexp_replace(used_new, '.*(Certified).*', 'Certified');
+    ```
+    
+- Removing the ‘empty’ line, ‘imputing’ the missing values
+    
+    ```sql
+    alter table cars_sold add drivetrain_assumed varchar2(17);
+    
+    update cars_sold 
+    set drivetrain='4WD' 
+    where drivetrain = 'Four-wheel Drive';
+    
+    update cars_sold set drivetrain='FWD' where drivetrain like '%ront%';
+    
+    update cars_sold set drivetrain='RWD' where drivetrain like '%Rear%';
+    
+    update cars_sold set drivetrain='AWD' where drivetrain like '%All%';
+    
+    ```
